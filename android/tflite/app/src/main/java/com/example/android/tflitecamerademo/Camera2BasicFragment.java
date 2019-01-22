@@ -26,9 +26,14 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.ImageFormat;
 import android.graphics.Matrix;
+import android.graphics.Paint;
+import android.graphics.PixelFormat;
 import android.graphics.Point;
+import android.graphics.PorterDuff;
 import android.graphics.RectF;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
@@ -51,6 +56,8 @@ import android.util.Log;
 import android.util.Size;
 import android.view.LayoutInflater;
 import android.view.Surface;
+import android.view.SurfaceHolder;
+import android.view.SurfaceView;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
@@ -83,6 +90,7 @@ public class Camera2BasicFragment extends Fragment
   private boolean checkedPermissions = false;
   private TextView textView;
   private ImageClassifier classifier;
+  private SurfaceView surfaceView;
 
   /** Max preview width that is guaranteed by Camera2 API */
   private static final int MAX_PREVIEW_WIDTH = 1920;
@@ -216,6 +224,44 @@ public class Camera2BasicFragment extends Fragment
   }
 
   /**
+   * Shows a {@link Toast} on the UI thread for the classification results.
+   *
+   * @param keyPoints A list of key points.
+   */
+  private void showKeyPoints(List<KeyPoint> keyPoints) {
+    final Activity activity = getActivity();
+    if (activity != null) {
+      activity.runOnUiThread(
+              new Runnable() {
+                @Override
+                public void run() {
+                  int x1 = (int) (Math.random() * 800);
+                  int y1 = (int) (Math.random() * 800);
+                  int x2 = (int) (Math.random() * 800);
+                  int y2 = (int) (Math.random() * 800);
+                  keyPoints.add(new KeyPoint(x1, y1, 0.1f));
+                  keyPoints.add(new KeyPoint(x2, y2, 0.1f));
+
+                  SurfaceHolder holder = surfaceView.getHolder();
+                  Canvas canvas = holder.lockCanvas();
+                  canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
+                  Paint myPaint = new Paint();
+                  myPaint.setColor(Color.RED);
+                  myPaint.setStrokeWidth(10);
+                  myPaint.setStyle(Paint.Style.STROKE);
+
+                  for (KeyPoint kp : keyPoints) {
+                    canvas.drawCircle(kp.x, kp.y, 20, myPaint);
+                  }
+
+
+                  holder.unlockCanvasAndPost(canvas);
+                }
+              });
+    }
+  }
+
+  /**
    * Resizes image.
    *
    * Attempting to use too large a preview size could  exceed the camera bus' bandwidth limitation,
@@ -289,6 +335,31 @@ public class Camera2BasicFragment extends Fragment
   public void onViewCreated(final View view, Bundle savedInstanceState) {
     textureView = (AutoFitTextureView) view.findViewById(R.id.texture);
     textView = (TextView) view.findViewById(R.id.text);
+
+    surfaceView = (SurfaceView) view.findViewById(R.id.surfaceView);
+    surfaceView.setZOrderOnTop(true);
+    SurfaceHolder mHolder = surfaceView.getHolder();
+    mHolder.setFormat(PixelFormat.TRANSPARENT);
+    mHolder.addCallback(new SurfaceHolder.Callback() {
+      @Override
+      public void surfaceCreated(SurfaceHolder holder) {
+        Canvas canvas = holder.lockCanvas();
+        if (canvas == null) {
+          Log.e(TAG, "Cannot draw onto the canvas.");
+        } else {
+          canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
+          holder.unlockCanvasAndPost(canvas);
+        }
+      }
+
+      @Override
+      public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+      }
+
+      @Override
+      public void surfaceDestroyed(SurfaceHolder holder) {
+      }
+    });
   }
 
   /** Load the model and labels. */
@@ -347,7 +418,7 @@ public class Camera2BasicFragment extends Fragment
 
         // We don't use a front facing camera in this sample.
         Integer facing = characteristics.get(CameraCharacteristics.LENS_FACING);
-        if (facing != null && facing == CameraCharacteristics.LENS_FACING_FRONT) {
+        if (facing != null && facing == CameraCharacteristics.LENS_FACING_BACK) {
           continue;
         }
 
@@ -663,6 +734,8 @@ public class Camera2BasicFragment extends Fragment
     String textToShow = classifier.classifyFrame(bitmap);
     bitmap.recycle();
     showToast(textToShow);
+    List<KeyPoint> keyPoints = new ArrayList<KeyPoint>();
+    showKeyPoints(keyPoints);
   }
 
   /** Compares two {@code Size}s based on their areas. */
