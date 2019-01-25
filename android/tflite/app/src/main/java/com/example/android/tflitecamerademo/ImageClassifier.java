@@ -43,7 +43,7 @@ public class ImageClassifier {
   private static final String TAG = "TfLiteCameraDemo";
 
   /** Name of the model file stored in Assets. */
-  private static final String MODEL_PATH = "graph.lite";
+  private static final String MODEL_PATH = "peaks-e2e.tflite";
 
   /** Name of the label file stored in Assets. */
   private static final String LABEL_PATH = "labels.txt";
@@ -56,8 +56,8 @@ public class ImageClassifier {
 
   private static final int DIM_PIXEL_SIZE = 3;
 
-  static final int DIM_IMG_SIZE_X = 224;
-  static final int DIM_IMG_SIZE_Y = 224;
+  static final int DIM_IMG_SIZE_X = 368;
+  static final int DIM_IMG_SIZE_Y = 432;
 
   private static final int IMAGE_MEAN = 128;
   private static final float IMAGE_STD = 128.0f;
@@ -77,6 +77,9 @@ public class ImageClassifier {
 
   /** An array to hold inference results, to be feed into Tensorflow Lite as outputs. */
   private float[][] labelProbArray = null;
+
+  private float[][][][] outputTensor = null;
+
   /** multi-stage low pass filter **/
   private float[][] filterLabelProbArray = null;
   private static final int FILTER_STAGES = 3;
@@ -102,6 +105,7 @@ public class ImageClassifier {
     imgData.order(ByteOrder.nativeOrder());
     labelProbArray = new float[1][labelList.size()];
     filterLabelProbArray = new float[FILTER_STAGES][labelList.size()];
+    outputTensor = new float[1][184][216][19];
     Log.d(TAG, "Created a Tensorflow Lite Image Classifier.");
   }
 
@@ -114,7 +118,8 @@ public class ImageClassifier {
     convertBitmapToByteBuffer(bitmap);
     // Here's where the magic happens!!!
     long startTime = SystemClock.uptimeMillis();
-    tflite.run(imgData, labelProbArray);
+    //tflite.run(imgData, labelProbArray);
+    tflite.run(imgData, outputTensor);
     long endTime = SystemClock.uptimeMillis();
     Log.d(TAG, "Timecost to run model inference: " + Long.toString(endTime - startTime));
 
